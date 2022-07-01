@@ -1,0 +1,160 @@
+Parameters:
+  StageName:
+    Type: String
+    Description: Name for API Gateway stage.
+    Default: dev
+
+Resources:
+  TestAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: ImagerTestAPI
+    DependsOn:
+      - TestFunction
+
+  TestAPIResource:
+    Type: "AWS::ApiGateway::Resource"
+    Properties:
+      RestApiId: !Ref TestAPI
+      ParentId: !GetAtt
+        - TestAPI
+        - RootResourceId
+      PathPart: upload_image
+    DependsOn:
+      - TestAPI
+
+  TestAPIMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TestAPI
+      ResourceId: !Ref TestAPIResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.img: true
+      MethodResponses:
+        - StatusCode: 200
+      Integration:
+        Type: AWS
+        RequestParameters:
+          integration.request.path.img: method.request.path.img
+        IntegrationResponses:
+          - StatusCode: 200
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - >-
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionNameARN}/invocations
+          - LambdaFunctionNameARN: !GetAtt TestFunction.Arn
+    DependsOn:
+      - TestAPIResource
+
+  TestAPIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref TestAPI
+    DependsOn:
+      - TestAPIMethod
+
+  TestAPIStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: !Ref StageName
+      Description: dev Stage
+      RestApiId: !Ref TestAPI
+      DeploymentId: !Ref TestAPIDeployment
+      MethodSettings:
+        - ResourcePath: /upload_image
+          HttpMethod: POST
+    DependsOn:
+      - TestAPIDeployment
+
+  TestAPIPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt TestFunction.Arn
+      Principal: apigateway.amazonaws.com
+    DependsOn:
+      - TestAPIStage
+
+  TestRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+        Version: "2012-10-17"
+      RoleName: CloudFormationTestRole
+      Policies:
+        - PolicyName: TestRolePolicies
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "dynamodb:PutItem"
+                  - "dynamodb:UpdateTable"
+                Resource: !GetAtt TestDBTable.Arn
+              - Effect: Allow
+                Action:
+                  - "s3:Put*"
+                Resource: !GetAtt TestBucket.Arn
+              - Effect: Allow
+                Action:
+                  - "s3:Put*"
+                Resource: !Join ["/", [!GetAtt TestBucket.Arn, "*"]]
+
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    DependsOn:
+      - TestBucket
+      - TestDBTable
+
+  TestBucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: image-upload-bucket-123321
+
+  TestDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Imager
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: "id"
+          AttributeType: "S"
+        - AttributeName: "image"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "id"
+          KeyType: HASH
+        - AttributeName: image
+          KeyType: RANGE
+
+  TestFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: "./functions"
+      Role: !GetAtt TestRole.Arn
+      FunctionName: TestFunction
+      Runtime: nodejs14.x
+      Handler: index.handler
+      Environment:
+        Variables:
+          databaseTableName: !Ref TestDBTable
+          bucketName: !Ref TestBucket
+    DependsOn:
+      - TestDBTable
+      - TestBucket
+
+Outputs:
+  TestAPIRoute:
+    Description: API route for uploading image
+    Value: !Sub "https://${TestAPI}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
