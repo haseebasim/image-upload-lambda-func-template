@@ -53,57 +53,5 @@ exports.handler = async (event) => {
   } catch (error) {
     console.log(error);
   }
-  // if (userId) {
-  //   var params = {
-  //     TableName: process.env.API_AMPLIFIEDTODO_USERSTATSTABLE_NAME,
-  //     FilterExpression: "userId = :this_userId",
-  //     ExpressionAttributeValues: { ":this_userId": userId },
-  //   };
-  //   myDocumentClient.scan(params, function (err, data) {
-  //     console.log(err);
-  //     console.log(data);
-
-  //     if (data.Items.length !== 0) {
-  //       console.log("update working");
-  //       myDocumentClient.update(
-  //         {
-  //           TableName: process.env.API_AMPLIFIEDTODO_USERSTATSTABLE_NAME,
-  //           Key: {
-  //             id: data.Items[0].id,
-  //           },
-  //           UpdateExpression: "SET #c = :s",
-  //           ExpressionAttributeValues: {
-  //             ":s": data.Items[0].count + 1,
-  //           },
-  //           ExpressionAttributeNames: {
-  //             "#c": "count",
-  //           },
-  //         },
-  //         function (err, data) {
-  //           if (err) console.log(err);
-  //           else console.log(data);
-  //         }
-  //       );
-  //     } else {
-  //       console.log("put working");
-  //       myDocumentClient.put(
-  //         {
-  //           Item: {
-  //             id: uuid.v1(),
-  //             userId: userId,
-  //             count: 1,
-  //           },
-  //           TableName: process.env.API_AMPLIFIEDTODO_USERSTATSTABLE_NAME,
-  //         },
-  //         function (err, data) {
-  //           if (err) {
-  //             console.log(err);
-  //           } else {
-  //             console.log(data);
-  //           }
-  //         }
-  //       );
-  //     }
-  //   });
-  // }
+ 
 };
